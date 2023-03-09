@@ -1,18 +1,17 @@
 # Tools for arpspoofing
 
-import subprocess
-import utils.app_properties as app_properties
+import utils.app_properties as app
 import utils.app_tools as app_tools
+import utils.net_tools as net_tools
+
+
+ip_addresses = list()
+mac_addresses = list()
 
 
 def is_command_available(command: str, cwd: str) -> int:
     try:
-        if not cwd:
-            process = subprocess.run(command, capture_output=True)
-        else:
-            process = subprocess.run(command, cwd=cwd, capture_output=True)
-
-        output = process.stderr.decode("utf-8")
+        output = app_tools.run_command(command, True, cwd)
         if "not found" in output or "not recognized" in output:
             return 1
 
@@ -20,64 +19,135 @@ def is_command_available(command: str, cwd: str) -> int:
             return 2
 
         return 0
-    except (FileNotFoundError, NotADirectoryError) as e:
+    except (FileNotFoundError, NotADirectoryError):
         return 1
 
 
-def select_executable(executable: app_properties.ARPCommand):
-    file = app_tools.select_file()
+def select_executable(executable: app.ARPCommand):
+    file = app_tools.select_file(app.config.IS_UNIX_LIKE_SYSTEM)
     command = file.name
-    if app_properties.properties.SYSTEM_NAME != "nt":
+    if app.config.IS_UNIX_LIKE_SYSTEM:
         command = "./" + command
 
-    if executable == app_properties.ARPCommand.ARPSPOOF:
-        app_properties.properties.arpspoof_command = command
-        app_properties.properties.arpspoof_path = str(file.parent)
-    elif executable == app_properties.ARPCommand.ARP_SCAN:
-        app_properties.properties.arp_scan_command = command
-        app_properties.properties.arp_scan_path = str(file.parent)
+    if executable == app.ARPCommand.ARPSPOOF:
+        app.config.arpspoof_command = command
+        app.config.arpspoof_path = str(file.parent)
+    elif executable == app.ARPCommand.ARP_SCAN:
+        app.config.arp_scan_command = command
+        app.config.arp_scan_path = str(file.parent)
     else:
         raise ValueError(f"{executable} is not interchangeable")
 
-    app_properties.write_config()
+    app.write_config()
 
 
-def get_arp_command(executable: app_properties.ARPCommand) -> tuple:
+def get_arp_command(executable: app.ARPCommand) -> tuple:
     cwd = ""
-    if executable == app_properties.ARPCommand.IP_A:
-        command = app_properties.properties.ip_a_command
-    elif executable == app_properties.ARPCommand.ARP:
+    if executable == app.ARPCommand.IP_A:
+        command = app.config.ip_a_command
+    elif executable == app.ARPCommand.ARP:
         command = "arp"
-    elif executable == app_properties.ARPCommand.ARPSPOOF:
-        command = app_properties.properties.arpspoof_command
-        cwd = app_properties.properties.arpspoof_path
+    elif executable == app.ARPCommand.ARPSPOOF:
+        command = app.config.arpspoof_command
+        cwd = app.config.arpspoof_path
     else:
-        command = app_properties.properties.arp_scan_command
-        cwd = app_properties.properties.arp_scan_path
+        command = app.config.arp_scan_command
+        cwd = app.config.arp_scan_path
 
     return command, cwd
 
 
-def look_up_for_arp_command(executable: app_properties.ARPCommand, required: bool):
+def ask_to_provide_a_copy(command: str, executable: app.ARPCommand) -> tuple:
+    app_tools.clear_screen(app.config.IS_UNIX_LIKE_SYSTEM)
+
+    exit_code = 0
+    print(f"{command.replace('./', '')} command not found!")
+    print("Do you want to provide a copy?")
+    print("1. Yes")
+    print("2. No, exit")
+    try:
+        if app_tools.select_option(["1", "2"], [True, False]):
+            select_executable(executable)
+            return get_arp_command(executable)
+    except InterruptedError:
+        print("No file provided, exiting...")
+        exit_code = 1
+
+    exit(exit_code)
+
+
+def look_up_for_arp_command(executable: app.ARPCommand, required: bool, can_provide_a_copy: bool):
     command, cwd = get_arp_command(executable)
     command_availability = is_command_available(command, cwd)
 
     while command_availability != 0:
-        if command_availability == 1 and required:
-            print(f"{command.replace('./', '')} command not found!")
-            print("Do you want to provide a copy?")
-            print("1. Yes")
-            print("2. No, exit")
-            if app_tools.select_option(["1", "2"], [True, False]):
-                select_executable(executable)
-                command, cwd = get_arp_command(executable)
-            else:
-                exit(0)
+        if command_availability == 1:
+            if required and can_provide_a_copy:
+                command, cwd = ask_to_provide_a_copy(command, executable)
+            elif required and not can_provide_a_copy:
+                print(f"{command.replace('./', '')} is required, please check 'Dependencies' section in README.md")
+                exit(1)
 
         if command_availability == 2:
             print(f"{command.replace('./', '')} requires elevated privileges!")
-            if app_properties.properties.SYSTEM_NAME != "nt":
+            if app.config.IS_UNIX_LIKE_SYSTEM:
                 print("    Try: sudo or doas")
             exit(1)
 
         command_availability = is_command_available(command, cwd)
+
+
+def setup_utility(ask_to_change_interface=False):
+    global ip_addresses, mac_addresses
+
+    app_tools.clear_screen(app.config.IS_UNIX_LIKE_SYSTEM)
+
+    print("  Setup")
+    if app.config.IS_UNIX_LIKE_SYSTEM:
+        if app.config.interface and ask_to_change_interface:
+            print("Do you want to setup other interface?")
+            print("1. Yes")
+            print("2. No")
+            if app_tools.select_option(["1", "2"], [True, False]):
+                app.config.interface = ""
+
+        if not app.config.interface:
+            app.config.interface = net_tools.select_interface()
+
+    ip_addresses, mac_addresses, mdns_mac = net_tools.list_devices_with_arp(app.config.interface)
+    app.config.mdns_mac = mdns_mac
+
+    if app.config.router_mac not in mac_addresses:
+        if len(ip_addresses) == len(mac_addresses):
+            devices = app_tools.merge_lists(ip_addresses, mac_addresses)
+            printable_ips, options = app_tools.enumerate_list(devices)
+        else:
+            printable_ips, options = app_tools.enumerate_list(ip_addresses)
+        print(printable_ips)
+        print("Select the router (gateway) IP")
+        app.config.router_mac = app_tools.select_option(options, mac_addresses)
+
+    app.config.setup_completed = True
+    app.write_config()
+
+
+def print_debug_data():
+    larger_key = 0
+
+    for key in app.PROPERTIES:
+        if len(key) > larger_key:
+            larger_key = len(key)
+
+    larger_key += 1
+
+    print("[ INFO ]  Temporally data")
+    missing_keys = ["SYSTEM_NAME", "IS_UNIX_LIKE_SYSTEM", "SETUP_COMPLETED"]
+    values = [app.config.SYSTEM_NAME, app.config.IS_UNIX_LIKE_SYSTEM, app.config.setup_completed]
+
+    for key, value in zip(missing_keys, values):
+        spacing = " " * (larger_key - len(key))
+        print(f"{key.upper()}{spacing}{value}")
+
+    for key in app.PROPERTIES:
+        spacing = " " * (larger_key - len(key))
+        print(f"{key.upper()}{spacing}{getattr(app.config, key.lower())}")

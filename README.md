@@ -4,6 +4,14 @@
 
 A basic python 3 project to ARP-Poisoning local users
 
+### Disclaimer
+
+This project is intended for _educational proposes_
+
+**I'm not responsible for any potencial malicious use of this software**
+
+Before running it, please read [LICENSE](LICENSE)
+
 ### Dependencies 
 
 1. Python 3.6 or newer
@@ -45,12 +53,22 @@ $ python main.py
 
 **Note:**
 When it's running for first time, you'll be asked to 
-provide a copy of `arpspoof` and `arp-scan` if they aren't
+provide a copy of `arpspoof` if it isn't
 installed in your system
 
 
 
 ### Changelog
+
+### v0.0.2
+
+- Improved menu
+- Improved app settings
+  - Added `interface`, `router_mac`, `mdns_mac`,
+    `allow_package_forwarding` and more settings
+- `arpspoofing_tool` can scan network for devices
+- Added settings section (WIP)
+
 
 ### v0.0.1
 

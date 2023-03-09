@@ -1,6 +1,7 @@
 # Various utilities
 
 from pathlib import Path
+import subprocess
 
 
 def read_file(file: Path) -> str:
@@ -26,10 +27,15 @@ def write_file(file: Path, data: str) -> bool:
         return False
 
 
-def select_file() -> Path:
+def select_file(is_unix_like_system: bool) -> Path:
     while True:
         print("Drag and drop your file")
-        file_path = input("> ").replace("\\", "").strip()
+        file_path = input("> ").strip()
+        if not file_path:
+            raise InterruptedError("No file path was given")
+
+        if is_unix_like_system:
+            file_path = file_path.replace("\\", "")
 
         file = Path(file_path)
         if file.exists():
@@ -42,7 +48,7 @@ def select_option(options: list, values=None) -> str:
     selection = ""
 
     while not selection:
-        selection = input("> ")
+        selection = input("> ").upper()
         if selection not in options:
             print("Invalid option")
             selection = ""
@@ -51,3 +57,40 @@ def select_option(options: list, values=None) -> str:
         return values[options.index(selection)]
     return selection
 
+
+def enumerate_list(data: list) -> tuple:
+    data_str = ""
+    options = list()
+    for i, dat in enumerate(data):
+        data_str += f"{i + 1}.\t{dat}\n"
+        options.append(f"{i + 1}")
+
+    return data_str[:-1], options
+
+
+def merge_lists(list1: list, list2: list) -> list:
+    new_list = list()
+    for item1, item2 in zip(list1, list2):
+        new_list.append(f"{item1}\t[{item2}]")
+
+    return new_list
+
+
+def clear_screen(is_unix_like_system: bool):
+    if is_unix_like_system:
+        subprocess.call("clear")
+    else:
+        subprocess.call("cls")
+
+
+def run_command(cmd: str, include_error_output: bool, cwd="") -> str:
+    if cwd:
+        process = subprocess.run(cmd, cwd=cwd, shell=True, capture_output=True)
+    else:
+        process = subprocess.run(cmd, shell=True, capture_output=True)
+
+    output = process.stdout.decode("utf-8")
+    if include_error_output:
+        output += process.stderr.decode("utf-8")
+
+    return output
