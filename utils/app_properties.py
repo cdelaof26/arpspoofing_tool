@@ -7,7 +7,8 @@ from enum import Enum
 
 
 PROPERTIES = ["IP_A_COMMAND", "ARP_COMMAND", "ARPSPOOF_COMMAND", "ARPSPOOF_PATH", "ARP_SCAN_COMMAND", "ARP_SCAN_PATH",
-              "INTERFACE", "ROUTER_MAC", "MDNS_MAC", "SCAN_EVERY_ARPSPOOF", "ALLOW_PACKAGE_FORWARDING", "RUN_SETUP_IN_STARTUP"]
+              "INTERFACE", "ROUTER_IP", "MDNS_IP", "SCAN_EVERY_ARPSPOOF", "ALLOW_PACKAGE_FORWARDING",
+              "RUN_SETUP_IN_STARTUP"]
 
 
 def get_system_name() -> str:
@@ -22,6 +23,8 @@ def get_system_name() -> str:
 def read_config() -> bool:
     global PROPERTIES_FILE, config
 
+    from utils.net_tools import is_packet_forwarding_enabled
+
     if not PROPERTIES_FILE.exists():
         write_config()
 
@@ -32,6 +35,8 @@ def read_config() -> bool:
 
     new_properties, incomplete_data = dict_to_app_properties(literal_eval(contents))
     config = new_properties
+
+    new_properties.allow_package_forwarding = is_packet_forwarding_enabled()
 
     if incomplete_data:
         write_config()
@@ -81,8 +86,8 @@ class AppProperties:
         self.arp_scan_path = ""
 
         self.interface = ""
-        self.router_mac = ""
-        self.mdns_mac = ""
+        self.router_ip = ""
+        self.mdns_ip = ""
         self.allow_package_forwarding = False
         self.scan_every_arpspoof = False
 
@@ -129,17 +134,15 @@ def manage_settings():
     global config
 
     from utils.arpspoof_tools import setup_utility, print_debug_data
+    from utils.net_tools import toggle_packet_forwarding
+    from utils.arpspoof_thread import toggle_packet_forwarding_in_threads
 
     while True:
         app_tools.clear_screen(config.IS_UNIX_LIKE_SYSTEM)
 
-        options = ["1", "3"]
-
         print("  Settings")
         print("1. Run setup")
-        if config.arpspoof_path != "":
-            print("2. Unlink ARPSpoof executable")
-            options += ["2"]
+        print("2. Unlink ARPSpoof executable")
 
         if config.arp_scan_path:
             print("3. Unlink arp-scan executable")
@@ -147,9 +150,9 @@ def manage_settings():
             print("3. Provide an arp-scan executable")
 
         if config.allow_package_forwarding:
-            print("4. Disable package forwarding")
+            print("4. Disable packet forwarding")
         else:
-            print("4. Enable package forwarding")
+            print("4. Enable packet forwarding")
 
         if config.run_setup_in_startup:
             print("5. Disable \"run setup\" in startup")
@@ -170,6 +173,11 @@ def manage_settings():
         if selection == "1":
             setup_utility(True)
         elif selection == "2":
+            if not config.arpspoof_path:
+                print("A copy of ARPSpoof wasn't provided, aborting...")
+                input("  Press enter to continue ")
+                continue
+
             print("This program will be terminated")
             print("  Do you want to proceed?")
             print("1. Yes")
@@ -178,13 +186,24 @@ def manage_settings():
                 config.reset_arpspoof()
                 write_config()
                 exit()
+        elif selection == "3":
+            print("Not implemented yet.")
+            input("  Press enter to continue ")
         elif selection == "4":
-            if config.allow_package_forwarding:
-                pass
-            else:
-                pass
+            if not config.IS_UNIX_LIKE_SYSTEM:
+                print("Sorry, Windows isn't supported")
+                print("  Please refer to "
+                      "https://serverfault.com/questions/929081/how-can-i-enable-packet-forwarding-on-windows")
+                input("  Press enter to continue ")
+                continue
+
+            config.allow_package_forwarding = not config.allow_package_forwarding
+            toggle_packet_forwarding(config.allow_package_forwarding)
+            toggle_packet_forwarding_in_threads(config.allow_package_forwarding)
         elif selection == "5":
             config.run_setup_in_startup = not config.run_setup_in_startup
+        elif selection == "6":
+            config.scan_every_arpspoof = not config.scan_every_arpspoof
         elif selection == "7":
             print_debug_data()
         else:

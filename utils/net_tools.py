@@ -1,5 +1,4 @@
 # Networking tools
-
 import utils.app_properties as app
 import utils.app_tools as app_tools
 import re
@@ -52,8 +51,37 @@ def list_devices_with_arp(interface="") -> tuple:
     mac_addresses = re.findall(r"\w{1,2}:\w{1,2}:\w{1,2}:\w{1,2}:\w{1,2}:\w{1,2}", output)
     mac_addresses += re.findall(r"\w{1,2}-\w{1,2}-\w{1,2}-\w{1,2}-\w{1,2}-\w{1,2}", output)
     mdns_mac = ""
-    if len(ip_addresses) == len(mac_addresses):  # All info was collected
+
+    complete_info = len(ip_addresses) == len(mac_addresses)
+
+    if complete_info:
         if "224.0.0.251" in ip_addresses:
             mdns_mac = mac_addresses[ip_addresses.index("224.0.0.251")]
 
-    return ip_addresses, mac_addresses, mdns_mac
+    return ip_addresses, mac_addresses, mdns_mac, complete_info
+
+
+def is_packet_forwarding_enabled() -> bool:
+    if not app.config.IS_UNIX_LIKE_SYSTEM:
+        return False
+
+    if app.config.SYSTEM_NAME == "darwin":
+        output = app_tools.run_command("sysctl -w net.inet.ip.forwarding", False)
+    else:
+        output = app_tools.run_command("sysctl net.ipv4.ip_forward", False)
+
+    return "1" in output
+
+
+def toggle_packet_forwarding(enable: bool):
+    if not app.config.IS_UNIX_LIKE_SYSTEM:
+        return
+
+    mode = 0
+    if enable:
+        mode = 1
+
+    if app.config.SYSTEM_NAME == "darwin":
+        app_tools.run_command(f"sysctl -w net.inet.ip.forwarding={mode}", False)
+    else:
+        app_tools.run_command(f"sysctl net.ipv4.ip_forward={mode}", False)

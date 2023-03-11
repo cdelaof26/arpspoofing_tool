@@ -3,10 +3,12 @@
 import utils.app_properties as app
 import utils.app_tools as app_tools
 import utils.net_tools as net_tools
+import utils.arpspoof_thread as thread_manager
 
 
 ip_addresses = list()
 mac_addresses = list()
+complete_data = False
 
 
 def is_command_available(command: str, cwd: str) -> int:
@@ -98,7 +100,7 @@ def look_up_for_arp_command(executable: app.ARPCommand, required: bool, can_prov
 
 
 def setup_utility(ask_to_change_interface=False):
-    global ip_addresses, mac_addresses
+    global ip_addresses, mac_addresses, complete_data
 
     app_tools.clear_screen(app.config.IS_UNIX_LIKE_SYSTEM)
 
@@ -114,18 +116,19 @@ def setup_utility(ask_to_change_interface=False):
         if not app.config.interface:
             app.config.interface = net_tools.select_interface()
 
-    ip_addresses, mac_addresses, mdns_mac = net_tools.list_devices_with_arp(app.config.interface)
-    app.config.mdns_mac = mdns_mac
+    ip_addresses, mac_addresses, mdns_ip, complete_data = net_tools.list_devices_with_arp(app.config.interface)
+    app.config.mdns_ip = mdns_ip
 
-    if app.config.router_mac not in mac_addresses:
-        if len(ip_addresses) == len(mac_addresses):
+    if app.config.router_ip not in ip_addresses:
+        if complete_data:
             devices = app_tools.merge_lists(ip_addresses, mac_addresses)
             printable_ips, options = app_tools.enumerate_list(devices)
         else:
             printable_ips, options = app_tools.enumerate_list(ip_addresses)
+
         print(printable_ips)
         print("Select the router (gateway) IP")
-        app.config.router_mac = app_tools.select_option(options, mac_addresses)
+        app.config.router_ip = app_tools.select_option(options, ip_addresses)
 
     app.config.setup_completed = True
     app.write_config()
@@ -151,3 +154,43 @@ def print_debug_data():
     for key in app.PROPERTIES:
         spacing = " " * (larger_key - len(key))
         print(f"{key.upper()}{spacing}{getattr(app.config, key.lower())}")
+
+
+def arpspoof_device():
+    global ip_addresses, mac_addresses, complete_data
+
+    if app.config.scan_every_arpspoof:
+        setup_utility(False)
+
+    if complete_data:
+        devices = app_tools.merge_lists(ip_addresses, mac_addresses)
+        devices += ["Cancel"]
+        printable_ips, options = app_tools.enumerate_list(devices)
+    else:
+        printable_ips, options = app_tools.enumerate_list(ip_addresses + ["Cancel"])
+
+    print("  Devices discovered")
+    print(printable_ips)
+    print("Select your target IP")
+    target_ip = app_tools.select_option(options, ip_addresses + ["E"])
+
+    if target_ip == "E":
+        return
+
+    if target_ip == app.config.router_ip:
+        print("You can't ARPSpoof the router!")
+        input("  Press enter to continue ")
+        return
+
+    if thread_manager.is_thread_targeting(target_ip):
+        print(f"A thread is already arpspoofing target {target_ip}")
+        input("  Press enter to continue ")
+        return
+
+    thread = thread_manager.ArpspoofThread(
+        app.config.interface, app.config.router_ip,
+        target_ip, app.config.allow_package_forwarding
+    )
+
+    thread_manager.created_threads.append(thread)
+    input("  Press enter to continue ")

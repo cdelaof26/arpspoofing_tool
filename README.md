@@ -60,6 +60,12 @@ installed in your system
 
 ### Changelog
 
+### v0.0.3
+- `ARPSpoof single device` implemented
+- Now `router` and `mDNS` IPs are saved instead MACs
+- User now is capable of toggle packet forwarding from settings menu
+
+
 ### v0.0.2
 
 - Improved menu

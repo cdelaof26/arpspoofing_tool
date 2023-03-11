@@ -1,6 +1,7 @@
 import utils.arpspoof_tools as arpspoof_tools
 import utils.app_properties as app
 import utils.app_tools as app_tools
+import utils.arpspoof_thread as thread_manager
 
 
 if not app.read_config():
@@ -21,7 +22,7 @@ if app.config.run_setup_in_startup:
 
 while True:
     app_tools.clear_screen(app.config.IS_UNIX_LIKE_SYSTEM)
-    print("    Welcome to arpspoofing tool")
+    print("    Welcome to arpspoofing tool!")
     print("  Main menu")
 
     options = ["1", "E"]
@@ -40,22 +41,32 @@ while True:
 
     try:
         selection = app_tools.select_option(options)
+
+        if selection != "E":
+            app_tools.clear_screen(app.config.IS_UNIX_LIKE_SYSTEM)
+
+        if selection == "1":
+            if app.config.setup_completed:
+                arpspoof_tools.arpspoof_device()
+            else:
+                arpspoof_tools.setup_utility()
+                arpspoof_tools.print_debug_data()
+        elif selection == "3":
+            if not app.config.mdns_mac:
+                print("No mDNS IP was detected in this network...")
+                input("  Press enter to continue ")
+
+        elif selection == "4":
+            arpspoof_tools.setup_utility(False)
+        if selection == "S":
+            app.manage_settings()
+
+        if selection == "E":
+            thread_manager.stop_threads()
+            break
     except KeyboardInterrupt:
         print("\n    Process cancelled!")
-        input("Press enter to continue ")
+        input("  Press enter to continue ")
         continue
-
-    if selection == "1":
-        if app.config.setup_completed:
-            pass
-        else:
-            arpspoof_tools.setup_utility()
-            arpspoof_tools.print_debug_data()
-
-    if selection == "S":
-        app.manage_settings()
-
-    if selection == "E":
-        break
 
 print("Bye")
