@@ -60,6 +60,17 @@ installed in your system
 
 ### Changelog
 
+### v0.0.4
+- Fixed `ARPSpoof single device`
+- Fixed `No mDNS IP was detected in this network...` if network data 
+  was incomplete
+- Improved app menus (now `Exit` is always `E`)
+- Implemented `Manage threads`
+  - User can start, suspend and remove all targets
+  - It's possible to create more than one thread for each target 
+    (not really sure if it's useful at all)
+
+
 ### v0.0.3
 - `ARPSpoof single device` implemented
 - Now `router` and `mDNS` IPs are saved instead MACs

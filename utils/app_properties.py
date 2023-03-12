@@ -6,6 +6,54 @@ import utils.app_tools as app_tools
 from enum import Enum
 
 
+class ARPCommand(Enum):
+    IP_A = 0
+    ARP = 1
+    ARPSPOOF = 2
+    ARP_SCAN = 3
+
+
+class AppProperties:
+    def __init__(self):
+        self.SYSTEM_NAME: str = get_system_name()
+        self.IS_UNIX_LIKE_SYSTEM: bool = self.SYSTEM_NAME != "nt"
+
+        if not self.IS_UNIX_LIKE_SYSTEM:
+            self.ip_a_command = ""
+            self.arp_command = "arp /a"
+            self.arpspoof_command = "arpspoof.exe"
+        else:
+            if self.SYSTEM_NAME == "darwin":
+                self.ip_a_command = "ifconfig"
+            else:
+                self.ip_a_command = "ip a"
+
+            self.arp_command = "arp -i %a -a"
+            self.arpspoof_command = "arpspoof"
+
+        self.arpspoof_path = ""
+
+        self.arp_scan_command = "arp-scan"
+        self.arp_scan_path = ""
+
+        self.interface = ""
+        self.router_ip = ""
+        self.mdns_ip = ""
+        self.allow_package_forwarding = False
+        self.scan_every_arpspoof = False
+
+        self.run_setup_in_startup = False
+        self.setup_completed = False
+
+    def reset_arpspoof(self):
+        if not self.IS_UNIX_LIKE_SYSTEM:
+            self.arpspoof_command = "arpspoof.exe"
+        else:
+            self.arpspoof_command = "arpspoof"
+
+        self.arpspoof_path = ""
+
+
 PROPERTIES = ["IP_A_COMMAND", "ARP_COMMAND", "ARPSPOOF_COMMAND", "ARPSPOOF_PATH", "ARP_SCAN_COMMAND", "ARP_SCAN_PATH",
               "INTERFACE", "ROUTER_IP", "MDNS_IP", "SCAN_EVERY_ARPSPOOF", "ALLOW_PACKAGE_FORWARDING",
               "RUN_SETUP_IN_STARTUP"]
@@ -53,54 +101,6 @@ def write_config() -> bool:
     data = app_properties_to_dict(config)
 
     return app_tools.write_file(PROPERTIES_FILE, str(data))
-
-
-class ARPCommand(Enum):
-    IP_A = 0
-    ARP = 1
-    ARPSPOOF = 2
-    ARP_SCAN = 3
-
-
-class AppProperties:
-    def __init__(self):
-        self.SYSTEM_NAME: str = get_system_name()
-        self.IS_UNIX_LIKE_SYSTEM: bool = self.SYSTEM_NAME != "nt"
-
-        if not self.IS_UNIX_LIKE_SYSTEM:
-            self.ip_a_command = ""
-            self.arp_command = "arp /a"
-            self.arpspoof_command = "arpspoof.exe"
-        else:
-            if self.SYSTEM_NAME == "darwin":
-                self.ip_a_command = "ifconfig"
-            else:
-                self.ip_a_command = "ip a"
-
-            self.arp_command = "arp -i %a -a"
-            self.arpspoof_command = "arpspoof"
-
-        self.arpspoof_path = ""
-
-        self.arp_scan_command = "arp-scan"
-        self.arp_scan_path = ""
-
-        self.interface = ""
-        self.router_ip = ""
-        self.mdns_ip = ""
-        self.allow_package_forwarding = False
-        self.scan_every_arpspoof = False
-
-        self.run_setup_in_startup = False
-        self.setup_completed = False
-
-    def reset_arpspoof(self):
-        if not self.IS_UNIX_LIKE_SYSTEM:
-            self.arpspoof_command = "arpspoof.exe"
-        else:
-            self.arpspoof_command = "arpspoof"
-
-        self.arpspoof_path = ""
 
 
 def app_properties_to_dict(data: AppProperties) -> dict:
@@ -162,7 +162,7 @@ def manage_settings():
         if config.scan_every_arpspoof:
             print("6. Scan network manually")
         else:
-            print("6. Scan network each time a device is arpspoofed")
+            print("6. Scan network each time a device is ARPSpoof-ed")
 
         print("E. Go back")
         print("Select an option")
@@ -200,6 +200,7 @@ def manage_settings():
             config.allow_package_forwarding = not config.allow_package_forwarding
             toggle_packet_forwarding(config.allow_package_forwarding)
             toggle_packet_forwarding_in_threads(config.allow_package_forwarding)
+            input("  Press enter to continue ")
         elif selection == "5":
             config.run_setup_in_startup = not config.run_setup_in_startup
         elif selection == "6":

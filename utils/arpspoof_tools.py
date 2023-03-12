@@ -156,23 +156,26 @@ def print_debug_data():
         print(f"{key.upper()}{spacing}{getattr(app.config, key.lower())}")
 
 
-def arpspoof_device():
+def arpspoof_device(target_ip=None):
     global ip_addresses, mac_addresses, complete_data
 
-    if app.config.scan_every_arpspoof:
-        setup_utility(False)
+    if target_ip is None:
+        if app.config.scan_every_arpspoof:
+            setup_utility(False)
 
-    if complete_data:
-        devices = app_tools.merge_lists(ip_addresses, mac_addresses)
-        devices += ["Cancel"]
-        printable_ips, options = app_tools.enumerate_list(devices)
-    else:
-        printable_ips, options = app_tools.enumerate_list(ip_addresses + ["Cancel"])
+        filtered_ips, filtered_macs = thread_manager.filter_ips(ip_addresses, mac_addresses, complete_data)
 
-    print("  Devices discovered")
-    print(printable_ips)
-    print("Select your target IP")
-    target_ip = app_tools.select_option(options, ip_addresses + ["E"])
+        if complete_data:
+            devices = app_tools.merge_lists(filtered_ips, filtered_macs)
+            printable_ips, options = app_tools.enumerate_list(devices)
+        else:
+            printable_ips, options = app_tools.enumerate_list(filtered_ips)
+
+        print("  Devices discovered")
+        print(printable_ips)
+        print("E. Cancel")
+        print("Select your target IP")
+        target_ip = app_tools.select_option(options + ["E"], filtered_ips + ["E"])
 
     if target_ip == "E":
         return
@@ -182,12 +185,12 @@ def arpspoof_device():
         input("  Press enter to continue ")
         return
 
-    if thread_manager.is_thread_targeting(target_ip):
+    if thread_manager.is_ip_targeted(target_ip):
         print(f"A thread is already arpspoofing target {target_ip}")
         input("  Press enter to continue ")
         return
 
-    thread = thread_manager.ArpspoofThread(
+    thread = thread_manager.ARPSpoofThread(
         app.config.interface, app.config.router_ip,
         target_ip, app.config.allow_package_forwarding
     )

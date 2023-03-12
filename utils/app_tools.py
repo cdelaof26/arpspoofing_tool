@@ -2,6 +2,7 @@
 
 from pathlib import Path
 import subprocess
+import re
 
 
 def read_file(file: Path) -> str:
@@ -58,6 +59,17 @@ def select_option(options: list, values=None) -> str:
     return selection
 
 
+def get_int_in(lower_bound: int, upper_bound: int) -> int:
+    number_str = ""
+    while not number_str:
+        number_str = input("> ")
+        if re.sub(r"\d+", "", number_str):  # There still any characters
+            print(f"Invalid input, integer must be in range [{lower_bound}, {upper_bound}]")
+            number_str = ""
+
+    return int(number_str)
+
+
 def enumerate_list(data: list) -> tuple:
     data_str = ""
     options = list()
@@ -94,3 +106,12 @@ def run_command(cmd: str, include_error_output: bool, cwd="") -> str:
         output += process.stderr.decode("utf-8")
 
     return output
+
+
+def get_command_process(cmd: str, cwd=""):
+    if cwd:
+        process = subprocess.Popen("exec " + cmd, cwd=cwd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    else:
+        process = subprocess.Popen("exec " + cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+    return process

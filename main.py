@@ -33,8 +33,9 @@ while True:
         print("2. ARPSpoof multiple devices")
         print("3. ARPSpoof mDNS IP")
         print("4. Re-scan network")
+        print("5. Manage threads")
         print("S. Settings")
-        options += ["2", "3", "4", "S"]
+        options += ["2", "3", "4", "5", "S"]
 
     print("E. Exit")
     print("Select an option")
@@ -52,21 +53,27 @@ while True:
                 arpspoof_tools.setup_utility()
                 arpspoof_tools.print_debug_data()
         elif selection == "3":
-            if not app.config.mdns_mac:
+            if not app.config.mdns_ip:
                 print("No mDNS IP was detected in this network...")
                 input("  Press enter to continue ")
 
+            arpspoof_tools.arpspoof_device(app.config.mdns_ip)
         elif selection == "4":
             arpspoof_tools.setup_utility(False)
-        if selection == "S":
+        elif selection == "5":
+            thread_manager.manage_threads()
+        elif selection == "S":
             app.manage_settings()
-
         if selection == "E":
-            thread_manager.stop_threads()
+            thread_manager.toggle_threads_status(False)
             break
     except KeyboardInterrupt:
         print("\n    Process cancelled!")
         input("  Press enter to continue ")
         continue
+    except OSError:
+        thread_manager.toggle_threads_status(False)
+        print("\n    IMPOSSIBLE TO OPEN MORE PROCESSES; EXITING APP")
+        break
 
 print("Bye")

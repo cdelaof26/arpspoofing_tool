@@ -50,15 +50,14 @@ def list_devices_with_arp(interface="") -> tuple:
     ip_addresses = re.findall(r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}", output)
     mac_addresses = re.findall(r"\w{1,2}:\w{1,2}:\w{1,2}:\w{1,2}:\w{1,2}:\w{1,2}", output)
     mac_addresses += re.findall(r"\w{1,2}-\w{1,2}-\w{1,2}-\w{1,2}-\w{1,2}-\w{1,2}", output)
-    mdns_mac = ""
+    mdns_ip = ""
 
     complete_info = len(ip_addresses) == len(mac_addresses)
 
-    if complete_info:
-        if "224.0.0.251" in ip_addresses:
-            mdns_mac = mac_addresses[ip_addresses.index("224.0.0.251")]
+    if "224.0.0.251" in ip_addresses:
+        mdns_ip = "224.0.0.251"
 
-    return ip_addresses, mac_addresses, mdns_mac, complete_info
+    return ip_addresses, mac_addresses, mdns_ip, complete_info
 
 
 def is_packet_forwarding_enabled() -> bool:
