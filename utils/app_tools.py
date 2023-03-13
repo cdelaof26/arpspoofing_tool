@@ -108,6 +108,20 @@ def run_command(cmd: str, include_error_output: bool, cwd="") -> str:
     return output
 
 
+def is_command_available(command: str, cwd: str) -> int:
+    try:
+        output = run_command(command, True, cwd)
+        if "not found" in output or "not recognized" in output:
+            return 1
+
+        if "Permission denied" in output:
+            return 2
+
+        return 0
+    except (FileNotFoundError, NotADirectoryError):
+        return 1
+
+
 def get_command_process(cmd: str, cwd=""):
     if cwd:
         process = subprocess.Popen("exec " + cmd, cwd=cwd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)

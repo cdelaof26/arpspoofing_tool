@@ -22,6 +22,7 @@ class AppProperties:
             self.ip_a_command = ""
             self.arp_command = "arp /a"
             self.arpspoof_command = "arpspoof.exe"
+            self.arp_scan_command = "arp-scan.exe"
         else:
             if self.SYSTEM_NAME == "darwin":
                 self.ip_a_command = "ifconfig"
@@ -30,10 +31,9 @@ class AppProperties:
 
             self.arp_command = "arp -i %a -a"
             self.arpspoof_command = "arpspoof"
+            self.arp_scan_command = "arp-scan"
 
         self.arpspoof_path = ""
-
-        self.arp_scan_command = "arp-scan"
         self.arp_scan_path = ""
 
         self.interface = ""
@@ -52,6 +52,14 @@ class AppProperties:
             self.arpspoof_command = "arpspoof"
 
         self.arpspoof_path = ""
+
+    def reset_arp_scan(self):
+        if not self.IS_UNIX_LIKE_SYSTEM:
+            self.arp_scan_command = "arp-scan.exe"
+        else:
+            self.arp_scan_command = "arp-scan"
+
+        self.arp_scan_path = ""
 
 
 PROPERTIES = ["IP_A_COMMAND", "ARP_COMMAND", "ARPSPOOF_COMMAND", "ARPSPOOF_PATH", "ARP_SCAN_COMMAND", "ARP_SCAN_PATH",
@@ -133,7 +141,7 @@ def dict_to_app_properties(data: dict) -> tuple:
 def manage_settings():
     global config
 
-    from utils.arpspoof_tools import setup_utility, print_debug_data
+    from utils.arpspoof_tools import setup_utility, get_arp_command, select_executable, print_debug_data
     from utils.net_tools import toggle_packet_forwarding
     from utils.arpspoof_thread import toggle_packet_forwarding_in_threads
 
@@ -187,8 +195,32 @@ def manage_settings():
                 write_config()
                 exit()
         elif selection == "3":
-            print("Not implemented yet.")
-            input("  Press enter to continue ")
+            if config.arp_scan_path:
+                config.reset_arp_scan()
+                continue
+
+            attempts = 0
+            while True:
+                if attempts > 0:
+                    print("Do you want to cancel?")
+                    print("1. Yes")
+                    print("2. No, let me retry")
+                    if app_tools.select_option(["1", "2"], [False, True]):
+                        break
+
+                command, cwd = get_arp_command(ARPCommand.ARP_SCAN)
+                is_arp_scan_available = app_tools.is_command_available(command, cwd)
+                if is_arp_scan_available == 2:
+                    print("arp-scan requires elevated privileges to run!")
+                    input("  Press enter to continue ")
+                    break
+                elif is_arp_scan_available == 1:
+                    select_executable(ARPCommand.ARP_SCAN)
+                    attempts += 1
+                else:
+                    if not config.arp_scan_path:
+                        config.arp_scan_path = "./"
+                    break
         elif selection == "4":
             if not config.IS_UNIX_LIKE_SYSTEM:
                 print("Sorry, Windows isn't supported")

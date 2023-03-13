@@ -60,6 +60,12 @@ installed in your system
 
 ### Changelog
 
+### v0.0.5
+- Implemented `ARPSpoof multiple devices`
+- Implemented network scan with `arp-scan`
+- Fixed negative threads bug when managing targets
+
+
 ### v0.0.4
 - Fixed `ARPSpoof single device`
 - Fixed `No mDNS IP was detected in this network...` if network data 

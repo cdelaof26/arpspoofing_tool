@@ -52,6 +52,8 @@ while True:
             else:
                 arpspoof_tools.setup_utility()
                 arpspoof_tools.print_debug_data()
+        if selection == "2":
+            arpspoof_tools.arpspoof_devices()
         elif selection == "3":
             if not app.config.mdns_ip:
                 print("No mDNS IP was detected in this network...")
@@ -64,7 +66,7 @@ while True:
             thread_manager.manage_threads()
         elif selection == "S":
             app.manage_settings()
-        if selection == "E":
+        elif selection == "E":
             thread_manager.toggle_threads_status(False)
             break
     except KeyboardInterrupt:

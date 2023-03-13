@@ -60,6 +60,48 @@ def list_devices_with_arp(interface="") -> tuple:
     return ip_addresses, mac_addresses, mdns_ip, complete_info
 
 
+def list_devices_with_arp_scan(interface="") -> tuple:
+    app_tools.clear_screen(app.config.IS_UNIX_LIKE_SYSTEM)
+
+    print("[ ARP-SCAN ] Scanning network...")
+
+    arp_scan_command = app.config.arp_scan_command
+    if not interface and app.config.IS_UNIX_LIKE_SYSTEM:
+        raise ValueError("Interface parameter is needed for Unix like systems")
+
+    if app.config.IS_UNIX_LIKE_SYSTEM:
+        arp_scan_command += f" --interface={interface}"
+
+    host_part = app.config.router_ip
+    while host_part[-1] != ".":  # Trims until '.' is the las char: 192.168.0.
+        host_part = host_part[:-1]
+
+    arp_scan_command += f" {host_part}0/24"
+
+    output = app_tools.run_command(arp_scan_command, True)
+
+    data = re.findall(host_part.replace(".", r"\.") + ".+", output)
+    ip_addresses = list()
+    mac_addresses = list()
+
+    for line in data:
+        ip_mac_name = line.split("\t")
+        if len(ip_mac_name) != 3:
+            continue
+
+        ip_addresses.append(ip_mac_name[0])
+        mac_addresses.append(f"{ip_mac_name[1]} - {ip_mac_name[2]}")
+
+    mdns_ip = ""
+
+    complete_info = len(ip_addresses) == len(mac_addresses)
+
+    if "224.0.0.251" in ip_addresses:
+        mdns_ip = "224.0.0.251"
+
+    return ip_addresses, mac_addresses, mdns_ip, complete_info
+
+
 def is_packet_forwarding_enabled() -> bool:
     if not app.config.IS_UNIX_LIKE_SYSTEM:
         return False

@@ -11,20 +11,6 @@ mac_addresses = list()
 complete_data = False
 
 
-def is_command_available(command: str, cwd: str) -> int:
-    try:
-        output = app_tools.run_command(command, True, cwd)
-        if "not found" in output or "not recognized" in output:
-            return 1
-
-        if "Permission denied" in output:
-            return 2
-
-        return 0
-    except (FileNotFoundError, NotADirectoryError):
-        return 1
-
-
 def select_executable(executable: app.ARPCommand):
     file = app_tools.select_file(app.config.IS_UNIX_LIKE_SYSTEM)
     command = file.name
@@ -80,7 +66,7 @@ def ask_to_provide_a_copy(command: str, executable: app.ARPCommand) -> tuple:
 
 def look_up_for_arp_command(executable: app.ARPCommand, required: bool, can_provide_a_copy: bool):
     command, cwd = get_arp_command(executable)
-    command_availability = is_command_available(command, cwd)
+    command_availability = app_tools.is_command_available(command, cwd)
 
     while command_availability != 0:
         if command_availability == 1:
@@ -96,7 +82,7 @@ def look_up_for_arp_command(executable: app.ARPCommand, required: bool, can_prov
                 print("    Try: sudo or doas")
             exit(1)
 
-        command_availability = is_command_available(command, cwd)
+        command_availability = app_tools.is_command_available(command, cwd)
 
 
 def setup_utility(ask_to_change_interface=False):
@@ -116,7 +102,11 @@ def setup_utility(ask_to_change_interface=False):
         if not app.config.interface:
             app.config.interface = net_tools.select_interface()
 
-    ip_addresses, mac_addresses, mdns_ip, complete_data = net_tools.list_devices_with_arp(app.config.interface)
+    if not app.config.arp_scan_path:
+        ip_addresses, mac_addresses, mdns_ip, complete_data = net_tools.list_devices_with_arp(app.config.interface)
+    else:
+        ip_addresses, mac_addresses, mdns_ip, complete_data = net_tools.list_devices_with_arp_scan(app.config.interface)
+
     app.config.mdns_ip = mdns_ip
 
     if app.config.router_ip not in ip_addresses:
@@ -156,8 +146,12 @@ def print_debug_data():
         print(f"{key.upper()}{spacing}{getattr(app.config, key.lower())}")
 
 
-def arpspoof_device(target_ip=None):
+def arpspoof_device(target_ip=None, return_status=False):
     global ip_addresses, mac_addresses, complete_data
+
+    app_tools.clear_screen(app.config.IS_UNIX_LIKE_SYSTEM)
+
+    filtered_ips = list()
 
     if target_ip is None:
         if app.config.scan_every_arpspoof:
@@ -165,30 +159,54 @@ def arpspoof_device(target_ip=None):
 
         filtered_ips, filtered_macs = thread_manager.filter_ips(ip_addresses, mac_addresses, complete_data)
 
+        if not filtered_ips:
+            print("All devices have been ARPSpoofed!")
+            input("  Press enter to continue ")
+            return False
+
         if complete_data:
             devices = app_tools.merge_lists(filtered_ips, filtered_macs)
             printable_ips, options = app_tools.enumerate_list(devices)
         else:
             printable_ips, options = app_tools.enumerate_list(filtered_ips)
 
+        extra_options = ["E"]
+
         print("  Devices discovered")
         print(printable_ips)
+        if return_status:
+            print("A. All")
+            extra_options.append("A")
+
         print("E. Cancel")
         print("Select your target IP")
-        target_ip = app_tools.select_option(options + ["E"], filtered_ips + ["E"])
+        target_ip = app_tools.select_option(options + extra_options, filtered_ips + extra_options)
 
     if target_ip == "E":
-        return
+        return False
 
     if target_ip == app.config.router_ip:
         print("You can't ARPSpoof the router!")
         input("  Press enter to continue ")
-        return
+        return True
 
     if thread_manager.is_ip_targeted(target_ip):
         print(f"A thread is already arpspoofing target {target_ip}")
         input("  Press enter to continue ")
-        return
+        return True
+
+    if target_ip == "A":
+        for ip in filtered_ips:
+            thread_manager.created_threads.append(
+                thread_manager.ARPSpoofThread(
+                    app.config.interface, app.config.router_ip,
+                    ip, app.config.allow_package_forwarding
+                )
+            )
+
+        input("  Press enter to continue ")
+
+        return False
 
     thread = thread_manager.ARPSpoofThread(
         app.config.interface, app.config.router_ip,
@@ -196,4 +214,12 @@ def arpspoof_device(target_ip=None):
     )
 
     thread_manager.created_threads.append(thread)
-    input("  Press enter to continue ")
+    if return_status:
+        return True
+    else:
+        input("  Press enter to continue ")
+
+
+def arpspoof_devices():
+    while arpspoof_device(None, True):
+        pass

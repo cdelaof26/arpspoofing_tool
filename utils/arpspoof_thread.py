@@ -88,6 +88,7 @@ class ARPSpoofThread:
                 self.process_target_router.pop(0)
 
             if not self.process_target_router:
+                self.amount_of_threads = 0
                 self.process_target_router = None
 
         if self.process_router_target is not None and do_operate_router_target(process_to_stop):
